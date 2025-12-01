@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Locations</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 400px; margin-bottom: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { padding: 8px 12px; border: 1px solid #ccc; text-align: left; }
+        th { background-color: #f4f4f4; }
+        button { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>User Locations</h2>
+    <div id="map"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Username</th>
+                <th>Show Location</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data %}
+            <tr>
+                <td>{{ item.time }}</td>
+                <td>{{ item.username }}</td>
+                <td>
+                    {% if item.location and item.location.lat is not none and item.location.lng is not none %}
+                    <button onclick="showLocation({{ item.location.lat }}, {{ item.location.lng }}, '{{ item.username }}', '{{ item.time }}')">Show Location</button>
+                    {% else %}
+                    No Location
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([0, 0], 2);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+        }).addTo(map);
+
+        let currentMarker = null;
+
+        function showLocation(lat, lng, username, time) {
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+            currentMarker = L.marker([lat, lng]).addTo(map);
+            currentMarker.bindPopup(`<b>${username}</b><br>Time: ${time}`).openPopup();
+            map.setView([lat, lng], 12);
+        }
+    </script>
+</body>
+</html>
