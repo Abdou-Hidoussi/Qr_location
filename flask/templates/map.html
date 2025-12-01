@@ -22,6 +22,7 @@
             <tr>
                 <th>Timestamp</th>
                 <th>Username</th>
+                <th>Team</th>
                 <th>Show Location</th>
             </tr>
         </thead>
@@ -30,9 +31,10 @@
             <tr>
                 <td>{{ item.time }}</td>
                 <td>{{ item.username }}</td>
+                <td>{{ item.qr_data }}</td>
                 <td>
                     {% if item.location and item.location.lat is not none and item.location.lng is not none %}
-                    <button onclick="showLocation({{ item.location.lat }}, {{ item.location.lng }}, '{{ item.username }}', '{{ item.time }}')">Show Location</button>
+                    <button onclick="showLocation({{ item.location.lat }}, {{ item.location.lng }}, '{{ item.username }}', '{{ item.qr_data }}', '{{ item.time }}')">Show Location</button>
                     {% else %}
                     No Location
                     {% endif %}
@@ -52,12 +54,12 @@
 
         let currentMarker = null;
 
-        function showLocation(lat, lng, username, time) {
+        function showLocation(lat, lng, username, team, time) {
             if (currentMarker) {
                 map.removeLayer(currentMarker);
             }
             currentMarker = L.marker([lat, lng]).addTo(map);
-            currentMarker.bindPopup(`<b>${username}</b><br>Time: ${time}`).openPopup();
+            currentMarker.bindPopup(`<b>${username}</b><br>Team: ${team}<br>Time: ${time}`).openPopup();
             map.setView([lat, lng], 12);
         }
     </script>
