@@ -1,98 +1,150 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// index.tsx
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import axios from "axios";
+import { BarCodeScannerResult, Camera } from "expo-camera";
+import * as Location from "expo-location";
+import React, { useEffect, useState } from "react";
+import { Alert, Button, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type RootStackParamList = {
+  Login: undefined;
+  Scanner: { username: string };
+};
 
-export default function HomeScreen() {
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const API = axios.create({
+  baseURL: "https://lebontechnicien.net/", // replace with your Flask backend
+});
+
+function LoginScreen({ navigation }: any) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert("Error", "Username and password required");
+      return;
+    }
+
+    try {
+      const res = await API.post("/login", { username, password });
+      Alert.alert("Success", "Login successful");
+      navigation.navigate("Scanner", { username });
+    } catch (err: any) {
+      Alert.alert("Error", err?.response?.data?.error || "Login failed");
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <Text style={styles.title}>Login</Text>
+      <TextInput
+        placeholder="Username"
+        value={username}
+        onChangeText={setUsername}
+        style={styles.input}
+      />
+      <TextInput
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        style={styles.input}
+      />
+      <Button title="Login" onPress={handleLogin} />
+    </View>
   );
 }
 
+function ScannerScreen({ route }: any) {
+  const { username } = route.params;
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [cameraRef, setCameraRef] = useState<Camera | null>(null);
+  const [scanned, setScanned] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === "granted");
+    })();
+  }, []);
+
+  const handleBarCodeScanned = async (scan: BarCodeScannerResult) => {
+    if (scanned) return;
+    setScanned(true);
+
+    // Get location
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Location permission required");
+      setScanned(false);
+      return;
+    }
+
+    const loc = await Location.getCurrentPositionAsync({});
+
+    const payload = {
+      username : username,
+      qr_data: scan.data,
+      location: {
+        lat: loc.coords.latitude,
+        lng: loc.coords.longitude,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await API.post("/api/scan", payload);
+      Alert.alert("Success", "Scan saved!");
+    } catch (err: any) {
+      Alert.alert("Error", err?.response?.data?.error || "Failed to save scan");
+    }
+
+    setTimeout(() => setScanned(false), 2000); // allow scanning again after 2s
+  };
+
+  if (hasPermission === null) return <Text>Requesting camera permission...</Text>;
+  if (hasPermission === false) return <Text>No access to camera</Text>;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Camera
+        style={{ flex: 1 }}
+        type={CameraType.back}
+        onBarCodeScanned={handleBarCodeScanned}
+        ref={(ref) => setCameraRef(ref)}
+      />
+      <View style={styles.footer}>
+        <Text style={{ color: "white", fontSize: 18 }}>Logged in as: {username}</Text>
+      </View>
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Scanner" component={ScannerScreen} />
+      </Stack.Navigator>
+  );
+}
+
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { flex: 1, padding: 20, justifyContent: "center", backgroundColor: "#f5f5f5" },
+  title: { fontSize: 28, marginBottom: 20, textAlign: "center" },
+  input: {
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 15,
+    borderRadius: 5,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    width: "100%",
+    alignItems: "center",
   },
 });
